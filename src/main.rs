@@ -14,6 +14,7 @@ enum Type {
 
 type BoardType = Vec<Vec<Type>>;
 
+#[derive(Clone)]
 struct Board {
     board: BoardType,
     shown_board: BoardType,
@@ -123,6 +124,9 @@ impl Board {
 
             exit(0);
         }
+        if actual == &Type::None && self.find_close_mines(x as isize, y as isize) <= 0 {
+            self.reveal_empties(x as isize, y as isize, &mut vec![]);
+        }
     }
 
     fn flag(&mut self, x: u8, y: u8) {
@@ -137,6 +141,61 @@ impl Board {
             }
             _ => {}
         }
+    }
+
+    fn reveal_empties(&mut self, x: isize, y: isize, traversed: &mut Vec<(isize, isize)>) {
+        if x < 0 || y < 0 {
+            return;
+        }
+        if (x as u8) >= self.length || (y as u8) >= self.height {
+            return;
+        }
+
+        if traversed.contains(&(x, y)) {
+            return;
+        }
+
+        let binding = self.clone();
+        let board = [
+            (x, y - 1, binding.index_board(x, y - 1)),
+            (x, y + 1, binding.index_board(x, y + 1)),
+            (x - 1, y, binding.index_board(x - 1, y)),
+            (x + 1, y, binding.index_board(x + 1, y)),
+        ];
+
+        traversed.push((x, y));
+        for (x, y, c) in board {
+            if x < 0 || y < 0 {
+                continue;
+            }
+
+            match c {
+                Type::None => {
+                    // It is a number. Reveal the number but reveal past it.
+                    if self.find_close_mines(x, y) > 0 {
+                        self.update_cell(x, y, Type::None);
+                        continue;
+                    }
+
+                    self.reveal_empties(x, y, traversed);
+                    self.update_cell(x, y, Type::None);
+                },
+                _ => {}
+            }
+
+            traversed.push((x, y));
+        }
+    }
+
+    fn update_cell(&mut self, x: isize, y: isize, t: Type) {
+        if x < 0 || y < 0 {
+            return;
+        }
+        if (x as u8) >= self.length || (y as u8) >= self.height {
+            return;
+        }
+
+        self.shown_board[x as usize][y as usize] = t;
     }
 }
 
@@ -180,8 +239,8 @@ fn main() {
     let console = Console::new();
     console.clear();
 
-    let mut board = Board::new(10, 10);
-    board.place_mines(10);
+    let mut board = Board::new(16, 16);
+    board.place_mines(40);
 
     loop {
         console.clear();
