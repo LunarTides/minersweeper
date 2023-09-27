@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::io::{self, Write};
 use std::process::exit;
 
 use rand::Rng;
@@ -7,7 +9,7 @@ enum Type {
     Flag,
     Mine,
     Hidden,
-    None
+    None,
 }
 
 type BoardType = Vec<Vec<Type>>;
@@ -16,7 +18,7 @@ struct Board {
     board: BoardType,
     shown_board: BoardType,
     length: u8,
-    height: u8
+    height: u8,
 }
 
 impl Board {
@@ -24,7 +26,12 @@ impl Board {
         let board: BoardType = vec![vec![Type::None; length.into()]; height.into()];
         let shown_board: BoardType = vec![vec![Type::Hidden; length.into()]; height.into()];
 
-        Board { board, shown_board, length, height }
+        Board {
+            board,
+            shown_board,
+            length,
+            height,
+        }
     }
 
     fn print(&self, board: &BoardType) {
@@ -34,7 +41,7 @@ impl Board {
                     Type::Mine => "M",
                     Type::Flag => "#",
                     Type::Hidden => "-",
-                    Type::None => " "
+                    Type::None => " ",
                 };
 
                 print!("{} ", char);
@@ -55,6 +62,13 @@ impl Board {
     }
 
     fn click(&mut self, x: u8, y: u8) {
+        if x >= self.length {
+            return;
+        }
+        if y >= self.height {
+            return;
+        }
+
         let space = &mut self.shown_board[x as usize][y as usize];
         let actual = &self.board[x as usize][y as usize];
 
@@ -66,9 +80,6 @@ impl Board {
             // The actual board shouldn't include a flag or hidden
             Type::Flag => unreachable!(),
             Type::Hidden => unreachable!(),
-            Type::Mine => {
-                *space = Type::None;
-            },
             _ => {
                 *space = actual.clone();
             }
@@ -99,6 +110,29 @@ impl Console {
         print!("\x1bc");
         println!("Minesweeper\n");
     }
+
+    fn input(&self, query: &str) -> String {
+        print!("{}", query);
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read input");
+
+        input.trim().into()
+    }
+
+    fn get_x_and_y(&self) -> Result<(u8, u8), Box<dyn Error>> {
+        let x = self.input("X: ").parse::<u8>()?;
+        let y = self.input("Y: ").parse::<u8>()?;
+
+        if x < 1 || y < 1 {
+            return Err("Integer underflow".into());
+        }
+
+        Ok((x - 1, y - 1))
+    }
 }
 
 fn main() {
@@ -107,9 +141,41 @@ fn main() {
 
     let mut board = Board::new(10, 10);
     board.place_mines(10);
-    
-    board.flag(5, 5);
-    board.click(4, 4);
 
-    board.print(&board.shown_board);
+    loop {
+        console.clear();
+        board.print(&board.shown_board);
+
+        let what = console
+            .input("\nWhat do you want to do? ([C]lick, [F]lag, [E]xit): ")
+            .chars()
+            .next()
+            .unwrap()
+            .to_ascii_lowercase();
+
+        match what {
+            'c' => {
+                let (x, y) = match console.get_x_and_y() {
+                    Ok(t) => t,
+                    Err(_) => continue,
+                };
+
+                board.click(x, y);
+            }
+            'f' => {
+                let (x, y) = match console.get_x_and_y() {
+                    Ok(t) => t,
+                    Err(_) => continue,
+                };
+
+                board.flag(x, y);
+            }
+            'e' => {
+                exit(0);
+            }
+            _ => {
+                console.input("Unknown value.\n");
+            }
+        }
+    }
 }
