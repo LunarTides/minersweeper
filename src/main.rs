@@ -35,19 +35,50 @@ impl Board {
     }
 
     fn print(&self, board: &BoardType) {
-        for i in board {
-            for v in i {
+        for (x, i) in board.iter().enumerate() {
+            for (y, v) in i.iter().enumerate() {
+                let number = self.find_close_mines(x as isize, y as isize) as u32;
+                let number = match number.to_string().chars().next().unwrap() {
+                    '0' => ' ',
+                    x => x,
+                };
+
                 let char = match v {
-                    Type::Mine => "M",
-                    Type::Flag => "#",
-                    Type::Hidden => "-",
-                    Type::None => " ",
+                    Type::Mine => 'M',
+                    Type::Flag => '#',
+                    Type::Hidden => '-',
+                    Type::None => number.to_string().chars().next().unwrap(),
                 };
 
                 print!("{} ", char);
             }
             println!();
         }
+    }
+
+    fn index_board(&self, x: isize, y: isize) -> &Type {
+        if x < 0 || y < 0 {
+            return &Type::None;
+        }
+        if (x as u8) >= self.height || (y as u8) >= self.length {
+            return &Type::None;
+        }
+
+        &self.board[x as usize][y as usize]
+    }
+    fn find_close_mines(&self, x: isize, y: isize) -> usize {
+        let board = [
+            self.index_board(x, y - 1),
+            self.index_board(x, y + 1),
+            self.index_board(x - 1, y),
+            self.index_board(x + 1, y),
+            self.index_board(x - 1, y - 1),
+            self.index_board(x - 1, y + 1),
+            self.index_board(x + 1, y - 1),
+            self.index_board(x + 1, y + 1),
+        ];
+
+        board.iter().filter(|x| **x == &Type::Mine).count()
     }
 
     fn place_mines(&mut self, amount: u16) {
@@ -69,8 +100,8 @@ impl Board {
             return;
         }
 
-        let space = &mut self.shown_board[x as usize][y as usize];
-        let actual = &self.board[x as usize][y as usize];
+        let space = &mut self.shown_board[y as usize][x as usize];
+        let actual = &self.board[y as usize][x as usize];
 
         if space == &Type::Flag {
             return;
@@ -95,7 +126,17 @@ impl Board {
     }
 
     fn flag(&mut self, x: u8, y: u8) {
-        self.shown_board[x as usize][y as usize] = Type::Flag;
+        let space = &mut self.shown_board[y as usize][x as usize];
+
+        match space {
+            Type::Hidden => {
+                *space = Type::Flag;
+            }
+            Type::Flag => {
+                *space = Type::Hidden;
+            }
+            _ => {}
+        }
     }
 }
 
@@ -145,6 +186,8 @@ fn main() {
     loop {
         console.clear();
         board.print(&board.shown_board);
+        // For debugging
+        //board.print(&board.board);
 
         let what = console
             .input("\nWhat do you want to do? ([C]lick, [F]lag, [E]xit): ")
