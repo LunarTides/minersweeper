@@ -53,8 +53,14 @@ impl Board {
 
                 print!("{} ", char);
             }
-            println!();
+            println!("{} ", x + 1);
         }
+
+        for i in 1..=self.length {
+            print!("{} ", i.to_string().chars().last().unwrap());
+        }
+
+        println!();
     }
 
     fn index_board(&self, x: isize, y: isize) -> &Type {
@@ -67,19 +73,33 @@ impl Board {
 
         &self.board[x as usize][y as usize]
     }
-    fn find_close_mines(&self, x: isize, y: isize) -> usize {
-        let board = [
-            self.index_board(x, y - 1),
-            self.index_board(x, y + 1),
-            self.index_board(x - 1, y),
-            self.index_board(x + 1, y),
-            self.index_board(x - 1, y - 1),
-            self.index_board(x - 1, y + 1),
-            self.index_board(x + 1, y - 1),
-            self.index_board(x + 1, y + 1),
-        ];
 
-        board.iter().filter(|x| **x == &Type::Mine).count()
+    fn find_neighbors(&self, x: isize, y: isize) -> [(isize, isize, &Type); 8] {
+        [
+            (x, y - 1, self.index_board(x, y - 1)),
+            (x, y + 1, self.index_board(x, y + 1)),
+            (x - 1, y, self.index_board(x - 1, y)),
+            (x + 1, y, self.index_board(x + 1, y)),
+            (x - 1, y - 1, self.index_board(x - 1, y - 1)),
+            (x - 1, y + 1, self.index_board(x - 1, y + 1)),
+            (x + 1, y - 1, self.index_board(x + 1, y - 1)),
+            (x + 1, y + 1, self.index_board(x + 1, y + 1)),
+        ]
+    }
+    fn find_neighbors_no_diagonal(&self, x: isize, y: isize) -> [(isize, isize, &Type); 4] {
+        [
+            (x, y - 1, self.index_board(x, y - 1)),
+            (x, y + 1, self.index_board(x, y + 1)),
+            (x - 1, y, self.index_board(x - 1, y)),
+            (x + 1, y, self.index_board(x + 1, y)),
+        ]
+    }
+
+    fn find_close_mines(&self, x: isize, y: isize) -> usize {
+        self.find_neighbors(x, y)
+            .iter()
+            .filter(|x| x.2 == &Type::Mine)
+            .count()
     }
 
     fn place_mines(&mut self, amount: u16) {
@@ -93,7 +113,40 @@ impl Board {
         }
     }
 
-    fn click(&mut self, x: u8, y: u8) {
+    fn first_click(&mut self, x: u8, y: u8) {
+        if self.index_board(x as isize, y as isize) == &Type::Mine {
+            // Move the mine somewhere else.
+            let binding = self.clone();
+            let board = binding.find_neighbors(x as isize, y as isize);
+
+            let mut rng = rand::thread_rng();
+            for (x, y, t) in board {
+                match t {
+                    Type::Mine => {}
+                    _ => continue,
+                }
+
+                let mut newx: u8;
+                let mut newy: u8;
+
+                loop {
+                    newx = rng.gen_range(0..self.height);
+                    newy = rng.gen_range(0..self.length);
+
+                    if newx as isize != x && newy as isize != y {
+                        break;
+                    }
+                }
+
+                self.board[newx as usize][newy as usize] = Type::Mine;
+            }
+            self.board[x as usize][y as usize] = Type::None;
+        }
+
+        self.click(x, y, true);
+    }
+
+    fn click(&mut self, x: u8, y: u8, first: bool) {
         if x >= self.length {
             return;
         }
@@ -124,7 +177,11 @@ impl Board {
 
             exit(0);
         }
-        if actual == &Type::None && self.find_close_mines(x as isize, y as isize) <= 0 {
+        if actual == &Type::None {
+            if self.find_close_mines(x as isize, y as isize) > 0 && !first {
+                return;
+            }
+
             self.reveal_empties(x as isize, y as isize, &mut vec![]);
         }
     }
@@ -155,32 +212,21 @@ impl Board {
             return;
         }
 
-        let binding = self.clone();
-        let board = [
-            (x, y - 1, binding.index_board(x, y - 1)),
-            (x, y + 1, binding.index_board(x, y + 1)),
-            (x - 1, y, binding.index_board(x - 1, y)),
-            (x + 1, y, binding.index_board(x + 1, y)),
-        ];
-
         traversed.push((x, y));
-        for (x, y, c) in board {
+        for (x, y, c) in self.clone().find_neighbors_no_diagonal(x, y) {
             if x < 0 || y < 0 {
                 continue;
             }
 
-            match c {
-                Type::None => {
-                    // It is a number. Reveal the number but reveal past it.
-                    if self.find_close_mines(x, y) > 0 {
-                        self.update_cell(x, y, Type::None);
-                        continue;
-                    }
-
-                    self.reveal_empties(x, y, traversed);
+            if c == &Type::None {
+                // It is a number. Reveal the number but reveal past it.
+                if self.find_close_mines(x, y) > 0 {
                     self.update_cell(x, y, Type::None);
-                },
-                _ => {}
+                    continue;
+                }
+
+                self.reveal_empties(x, y, traversed);
+                self.update_cell(x, y, Type::None);
             }
 
             traversed.push((x, y));
@@ -242,11 +288,12 @@ fn main() {
     let mut board = Board::new(16, 16);
     board.place_mines(40);
 
+    let mut first = true;
     loop {
         console.clear();
         board.print(&board.shown_board);
         // For debugging
-        //board.print(&board.board);
+        // board.print(&board.board);
 
         let what = console
             .input("\nWhat do you want to do? ([C]lick, [F]lag, [E]xit): ")
@@ -262,7 +309,11 @@ fn main() {
                     Err(_) => continue,
                 };
 
-                board.click(x, y);
+                if first {
+                    board.first_click(x, y);
+                } else {
+                    board.click(x, y, false);
+                }
             }
             'f' => {
                 let (x, y) = match console.get_x_and_y() {
@@ -279,5 +330,7 @@ fn main() {
                 console.input("Unknown value.\n");
             }
         }
+
+        first = false;
     }
 }
