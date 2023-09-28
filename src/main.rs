@@ -291,7 +291,7 @@ impl Console {
 
     fn clear(&self) {
         print!("\x1bc");
-        println!("Minesweeper\n");
+        println!("Minersweeper (c) 2023\n");
     }
 
     fn input(&self, query: &str) -> String {
