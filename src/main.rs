@@ -173,8 +173,12 @@ impl Board {
         let space = &mut self.shown_board[y as usize][x as usize];
         let actual = &self.board[y as usize][x as usize];
 
-        if space == &Type::Flag {
-            return Err("There is a flag in the way".into());
+        // Make sure that you clicked a hidden
+        match space {
+            Type::Flag => return Err("There is a flag in the way".into()),
+            Type::None => return Err("You cannot click an empty square.".into()),
+            Type::Mine => unreachable!(),
+            Type::Hidden => {}
         }
 
         match actual {
@@ -201,7 +205,7 @@ impl Board {
         Ok(())
     }
 
-    fn flag(&mut self, x: u8, y: u8) {
+    fn flag(&mut self, x: u8, y: u8) -> Result<(), Box<dyn Error>> {
         let space = &mut self.shown_board[y as usize][x as usize];
         let actual = &mut self.board[y as usize][x as usize];
 
@@ -222,8 +226,11 @@ impl Board {
                     self.mines += 1;
                 }
             }
-            _ => {}
+            Type::None => return Err("Cannot flag an empty square.".into()),
+            Type::Mine => unreachable!(),
         }
+
+        Ok(())
     }
 
     fn reveal_empties(
@@ -351,6 +358,8 @@ fn main() {
                     println!("{}", e);
                     console.input("");
                 }
+
+                first = false;
             }
             'f' => {
                 let (x, y) = match console.get_x_and_y() {
@@ -358,7 +367,10 @@ fn main() {
                     Err(_) => continue,
                 };
 
-                board.flag(x, y);
+                if let Err(e) = board.flag(x, y) {
+                    println!("{}", e);
+                    console.input("");
+                }
             }
             'e' => {
                 exit(0);
@@ -367,8 +379,6 @@ fn main() {
                 console.input("Unknown value.\n");
             }
         }
-
-        first = false;
 
         // The player shouldn't be able to just flag every square to win.
         // Prevent that using the second condition
