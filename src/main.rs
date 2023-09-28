@@ -20,6 +20,9 @@ struct Board {
     shown_board: BoardType,
     length: u8,
     height: u8,
+    mines: u32,
+    shown_mines: i32,
+    lost: bool,
 }
 
 impl Board {
@@ -32,6 +35,9 @@ impl Board {
             shown_board,
             length,
             height,
+            mines: 0,
+            shown_mines: 0,
+            lost: false,
         }
     }
 
@@ -102,7 +108,7 @@ impl Board {
             .count()
     }
 
-    fn place_mines(&mut self, amount: u16) {
+    fn place_mines(&mut self, amount: u32) {
         let mut rng = rand::thread_rng();
 
         for _ in 1..=amount {
@@ -111,6 +117,9 @@ impl Board {
 
             self.board[x as usize][y as usize] = Type::Mine;
         }
+
+        self.mines = amount;
+        self.shown_mines = amount as i32;
     }
 
     fn move_all_mines_neighboring(&mut self, x: u8, y: u8) {
@@ -182,10 +191,7 @@ impl Board {
 
         if actual == &Type::Mine {
             // Lose the game
-            println!("You lose.");
-            self.print(&self.shown_board);
-
-            exit(0);
+            self.lost = true;
         }
         if actual == &Type::None {
             if self.find_close_mines(x as isize, y as isize) > 0 && !first {
@@ -198,13 +204,24 @@ impl Board {
 
     fn flag(&mut self, x: u8, y: u8) {
         let space = &mut self.shown_board[y as usize][x as usize];
+        let actual = &mut self.board[y as usize][x as usize];
 
         match space {
             Type::Hidden => {
                 *space = Type::Flag;
+
+                self.shown_mines -= 1;
+                if actual == &Type::Mine {
+                    self.mines -= 1;
+                }
             }
             Type::Flag => {
                 *space = Type::Hidden;
+
+                self.shown_mines += 1;
+                if actual == &Type::Mine {
+                    self.mines += 1;
+                }
             }
             _ => {}
         }
@@ -295,22 +312,25 @@ fn main() {
     let console = Console::new();
     console.clear();
 
-    let mut board = Board::new(16, 16);
-    board.place_mines(40);
+    let mut board = Board::new(9, 9);
+    board.place_mines(10);
 
     let mut first = true;
     loop {
         console.clear();
+        println!("Mines left {}", board.shown_mines);
         board.print(&board.shown_board);
         // For debugging
         // board.print(&board.board);
 
-        let what = console
+        let what = match console
             .input("\nWhat do you want to do? ([C]lick, [F]lag, [E]xit): ")
             .chars()
             .next()
-            .unwrap()
-            .to_ascii_lowercase();
+        {
+            Some(what) => what.to_ascii_lowercase(),
+            None => continue,
+        };
 
         match what {
             'c' => {
@@ -342,5 +362,25 @@ fn main() {
         }
 
         first = false;
+
+        // The player shouldn't be able to just flag every square to win.
+        // Prevent that using the second condition
+        if board.mines == 0 && board.shown_mines == 0 {
+            console.clear();
+
+            println!("You win!");
+            board.print(&board.board);
+
+            exit(0);
+        }
+
+        if board.lost {
+            console.clear();
+
+            println!("You lose.");
+            board.print(&board.board);
+
+            exit(0);
+        }
     }
 }
