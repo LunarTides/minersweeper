@@ -70,10 +70,7 @@ impl Board {
     }
 
     fn index_board(&self, x: isize, y: isize) -> &Type {
-        if x < 0 || y < 0 {
-            return &Type::None;
-        }
-        if (x as u8) >= self.height || (y as u8) >= self.length {
+        if !self.check_bounds(x, y) {
             return &Type::None;
         }
 
@@ -231,10 +228,7 @@ impl Board {
     }
 
     fn reveal_empties(&mut self, x: isize, y: isize, traversed: &mut Vec<(isize, isize)>) {
-        if x < 0 || y < 0 {
-            return;
-        }
-        if (x as u8) >= self.length || (y as u8) >= self.height {
+        if !self.check_bounds(x, y) {
             return;
         }
 
@@ -244,34 +238,34 @@ impl Board {
 
         traversed.push((x, y));
         for (x, y, c) in self.clone().find_neighbors_no_diagonal(x, y) {
-            if x < 0 || y < 0 {
+            if !self.check_bounds(x, y) {
                 continue;
             }
 
             if c == &Type::None {
                 // It is a number. Reveal the number but dont reveal past it.
+                self.shown_board[x as usize][y as usize] = Type::None;
+
                 if self.find_close_mines(x, y) > 0 {
-                    self.update_cell(x, y, Type::None);
                     continue;
                 }
 
                 self.reveal_empties(x, y, traversed);
-                self.update_cell(x, y, Type::None);
             }
 
             traversed.push((x, y));
         }
     }
 
-    fn update_cell(&mut self, x: isize, y: isize, t: Type) {
+    fn check_bounds(&self, x: isize, y: isize) -> bool {
         if x < 0 || y < 0 {
-            return;
+            return false;
         }
         if (x as u8) >= self.length || (y as u8) >= self.height {
-            return;
+            return false;
         }
 
-        self.shown_board[x as usize][y as usize] = t;
+        true
     }
 }
 
