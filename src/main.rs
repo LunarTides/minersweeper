@@ -111,7 +111,7 @@ impl Board {
     fn place_mines(&mut self, amount: u32) {
         let mut rng = rand::thread_rng();
 
-        for _ in 1..=amount {
+        while self.total_mines() < amount.try_into().unwrap() {
             let x = rng.gen_range(0..self.height);
             let y = rng.gen_range(0..self.length);
 
@@ -120,6 +120,14 @@ impl Board {
 
         self.mines = amount;
         self.shown_mines = amount as i32;
+    }
+
+    fn total_mines(&self) -> usize {
+        self.board
+            .iter()
+            .map(|f| f.iter().filter(|g| g == &&Type::Mine).count())
+            .reduce(|acc, e| acc + e)
+            .unwrap()
     }
 
     fn move_all_mines_neighboring(&mut self, x: u8, y: u8) {
@@ -307,8 +315,8 @@ fn main() {
     let console = Console::new();
     console.clear();
 
-    let mut board = Board::new(9, 9);
-    board.place_mines(10);
+    let mut board = Board::new(16, 16);
+    board.place_mines(40);
 
     let mut first = true;
     loop {
