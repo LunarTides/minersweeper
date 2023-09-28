@@ -165,10 +165,10 @@ impl Board {
 
     fn first_click(&mut self, x: u8, y: u8) {
         self.move_all_mines_neighboring(x, y);
-        self.click(x, y, true);
+        self.click(x, y);
     }
 
-    fn click(&mut self, x: u8, y: u8, first: bool) {
+    fn click(&mut self, x: u8, y: u8) {
         if x >= self.length {
             return;
         }
@@ -197,7 +197,7 @@ impl Board {
             self.lost = true;
         }
         if actual == &Type::None {
-            if self.find_close_mines(x as isize, y as isize) > 0 && !first {
+            if self.find_close_mines(x as isize, y as isize) > 0 {
                 return;
             }
 
@@ -345,7 +345,7 @@ fn main() {
                 if first {
                     board.first_click(x, y);
                 } else {
-                    board.click(x, y, false);
+                    board.click(x, y);
                 }
             }
             'f' => {
