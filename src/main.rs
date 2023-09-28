@@ -160,24 +160,21 @@ impl Board {
         }
     }
 
-    fn first_click(&mut self, x: u8, y: u8) {
+    fn first_click(&mut self, x: u8, y: u8) -> Result<(), Box<dyn Error>> {
         self.move_all_mines_neighboring(x, y);
-        self.click(x, y);
+        self.click(x, y)
     }
 
-    fn click(&mut self, x: u8, y: u8) {
-        if x >= self.length {
-            return;
-        }
-        if y >= self.height {
-            return;
+    fn click(&mut self, x: u8, y: u8) -> Result<(), Box<dyn Error>> {
+        if !self.check_bounds(x as isize, y as isize) {
+            return Err("Out of bounds.".into());
         }
 
         let space = &mut self.shown_board[y as usize][x as usize];
         let actual = &self.board[y as usize][x as usize];
 
         if space == &Type::Flag {
-            return;
+            return Err("There is a flag in the way".into());
         }
 
         match actual {
@@ -195,11 +192,13 @@ impl Board {
         }
         if actual == &Type::None {
             if self.find_close_mines(x as isize, y as isize) > 0 {
-                return;
+                return Ok(());
             }
 
-            self.reveal_empties(x as isize, y as isize, &mut vec![]);
+            let _ = self.reveal_empties(x as isize, y as isize, &mut vec![]);
         }
+
+        Ok(())
     }
 
     fn flag(&mut self, x: u8, y: u8) {
@@ -227,13 +226,18 @@ impl Board {
         }
     }
 
-    fn reveal_empties(&mut self, x: isize, y: isize, traversed: &mut Vec<(isize, isize)>) {
+    fn reveal_empties(
+        &mut self,
+        x: isize,
+        y: isize,
+        traversed: &mut Vec<(isize, isize)>,
+    ) -> Result<(), Box<dyn Error>> {
         if !self.check_bounds(x, y) {
-            return;
+            return Err("Out of bounds.".into());
         }
 
         if traversed.contains(&(x, y)) {
-            return;
+            return Ok(());
         }
 
         traversed.push((x, y));
@@ -250,11 +254,13 @@ impl Board {
                     continue;
                 }
 
-                self.reveal_empties(x, y, traversed);
+                let _ = self.reveal_empties(x, y, traversed);
             }
 
             traversed.push((x, y));
         }
+
+        Ok(())
     }
 
     fn check_bounds(&self, x: isize, y: isize) -> bool {
@@ -337,9 +343,13 @@ fn main() {
                 };
 
                 if first {
-                    board.first_click(x, y);
-                } else {
-                    board.click(x, y);
+                    if let Err(e) = board.first_click(x, y) {
+                        println!("{}", e);
+                        console.input("");
+                    }
+                } else if let Err(e) = board.click(x, y) {
+                    println!("{}", e);
+                    console.input("");
                 }
             }
             'f' => {
