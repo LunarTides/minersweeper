@@ -48,7 +48,7 @@ impl Board {
                     Type::Mine => 'M',
                     Type::Flag => '#',
                     Type::Hidden => '-',
-                    Type::None => number.to_string().chars().next().unwrap(),
+                    Type::None => number,
                 };
 
                 print!("{} ", char);
@@ -113,42 +113,46 @@ impl Board {
         }
     }
 
-    fn first_click(&mut self, x: u8, y: u8) {
+    fn move_all_mines_neighboring(&mut self, x: u8, y: u8) {
         // Move all neighbor mines somewhere else.
         let binding = self.clone();
         let board = binding.find_neighbors(x as isize, y as isize);
 
         let mut rng = rand::thread_rng();
-        for (x, y, t) in board {
-            match t {
-                Type::Mine => {}
-                _ => continue,
-            }
-
-            let mut newx: u8;
-            let mut newy: u8;
-
-            loop {
-                newx = rng.gen_range(0..self.height);
-                newy = rng.gen_range(0..self.length);
-
-                if newx as isize != x && newy as isize != y {
-                    break;
+        while self.index_board(x as isize, y as isize) == &Type::Mine
+            || self
+                .find_neighbors(x as isize, y as isize)
+                .iter()
+                .filter(|f| f.2 == &Type::Mine)
+                .count()
+                > 0
+        {
+            for (oldx, oldy, t) in board {
+                match t {
+                    Type::Mine => {}
+                    _ => continue,
                 }
+
+                let newx = rng.gen_range(0..self.height);
+                let newy = rng.gen_range(0..self.length);
+
+                self.board[newx as usize][newy as usize] = Type::Mine;
+                self.board[oldx as usize][oldy as usize] = Type::None;
             }
 
-            self.board[newx as usize][newy as usize] = Type::Mine;
+            if self.index_board(x as isize, y as isize) == &Type::Mine {
+                // Move the mine somewhere else.
+                let newx = rand::thread_rng().gen_range(0..self.height);
+                let newy = rand::thread_rng().gen_range(0..self.length);
+
+                self.board[newx as usize][newy as usize] = Type::Mine;
+                self.board[x as usize][y as usize] = Type::None;
+            }
         }
+    }
 
-        if self.index_board(x as isize, y as isize) == &Type::Mine {
-            // Move the mine somewhere else.
-            let newx = rand::thread_rng().gen_range(0..self.height);
-            let newy = rand::thread_rng().gen_range(0..self.length);
-
-            self.board[newx as usize][newy as usize] = Type::Mine;
-            self.board[x as usize][y as usize] = Type::None;
-        }
-
+    fn first_click(&mut self, x: u8, y: u8) {
+        self.move_all_mines_neighboring(x, y);
         self.click(x, y, true);
     }
 
@@ -225,7 +229,7 @@ impl Board {
             }
 
             if c == &Type::None {
-                // It is a number. Reveal the number but reveal past it.
+                // It is a number. Reveal the number but dont reveal past it.
                 if self.find_close_mines(x, y) > 0 {
                     self.update_cell(x, y, Type::None);
                     continue;
