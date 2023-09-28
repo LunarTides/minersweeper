@@ -129,12 +129,7 @@ impl Board {
 
         let mut rng = rand::thread_rng();
         while self.index_board(x as isize, y as isize) == &Type::Mine
-            || self
-                .find_neighbors(x as isize, y as isize)
-                .iter()
-                .filter(|f| f.2 == &Type::Mine)
-                .count()
-                > 0
+            || self.find_close_mines(x as isize, y as isize) > 0
         {
             for (oldx, oldy, t) in board {
                 match t {
